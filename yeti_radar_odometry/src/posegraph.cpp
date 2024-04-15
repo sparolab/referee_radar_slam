@@ -54,6 +54,7 @@
 #include "nano_gicp/nano_gicp.hpp"
 #include "nano_gicp/point_type_nano_gicp.hpp"
 #include "nano_gicp/nano_gicp.hpp"
+#include "tf_eigen_manager.h"
 
 using namespace gtsam;
 
@@ -62,14 +63,15 @@ using std::endl;
 
 typedef pcl::PointXYZI PointType;
 
-struct Pose6D 
-{
+struct Pose6D {
   double x;
   double y;
   double z;
   double roll;
   double pitch;
   double yaw;
+  Pose6D(double x, double y, double z, double roll, double pitch, double yaw)
+  : x(x), y(y), z(z), roll(roll), pitch(pitch), yaw(yaw) {}
 };
 
 typedef struct LoopICP {
@@ -141,6 +143,7 @@ std::fstream pgG2oSaveStream, pgTimeSaveStream;
 std::vector<std::string> edges_str; // used in writeEdge
 
 pcl::visualization::CloudViewer viewer("Cloud Viewer");
+std::vector<float> icp_scores;
 
 Pose6D getOdom(nav_msgs::Odometry::ConstPtr _odom)
 {
@@ -409,7 +412,7 @@ void runISAM2opt(void)
     updatePoses();
 }
 
-pcl::PointCloud<PointType>::Ptr transformPointCloud(pcl::PointCloud<PointType>::Ptr cloudIn, Eigen::Matrix4f rot_mat) {
+pcl::PointCloud<PointType>::Ptr transformPointCloud(pcl::PointCloud<PointType>::Ptr cloudIn, Eigen::Matrix4d rot_mat) {
     pcl::PointCloud<PointType>::Ptr cloudOut(new pcl::PointCloud<PointType>());
 
     PointType *pointFrom;
@@ -430,16 +433,44 @@ pcl::PointCloud<PointType>::Ptr transformPointCloud(pcl::PointCloud<PointType>::
     return cloudOut;
 } // transformPointCloud
 
-void loopFindNearKeyframesCloud( pcl::PointCloud<PointType>::Ptr& nearKeyframes, const int& key, const int& submap_size, const int& root_idx) {
+pcl::PointCloud<PointType>::Ptr transformPointCloud(pcl::PointCloud<PointType>::Ptr cloudIn, const Pose6D& tf) {
+    pcl::PointCloud<PointType>::Ptr cloudOut(new pcl::PointCloud<PointType>());
+
+    PointType *pointFrom;
+
+    int cloudSize = cloudIn->size();
+    cloudOut->resize(cloudSize);
+
+    Eigen::Affine3f transCur = pcl::getTransformation(tf.x, tf.y, tf.z, tf.roll, tf.pitch, tf.yaw);
+    
+    int numberOfCores = 16;
+    #pragma omp parallel for num_threads(numberOfCores)
+    for (int i = 0; i < cloudSize; ++i)
+    {
+        const auto &pointFrom = cloudIn->points[i];
+        cloudOut->points[i].x = transCur(0,0) * pointFrom.x + transCur(0,1) * pointFrom.y + transCur(0,2) * pointFrom.z + transCur(0,3);
+        cloudOut->points[i].y = transCur(1,0) * pointFrom.x + transCur(1,1) * pointFrom.y + transCur(1,2) * pointFrom.z + transCur(1,3);
+        cloudOut->points[i].z = transCur(2,0) * pointFrom.x + transCur(2,1) * pointFrom.y + transCur(2,2) * pointFrom.z + transCur(2,3);
+        cloudOut->points[i].intensity = pointFrom.intensity;
+    }
+    return cloudOut;
+} // transformPointCloud
+
+void loopFindNearKeyframesCloud(pcl::PointCloud<PointType>::Ptr& nearKeyframes, const int& key, const int& submap_size, const int& root_idx) {
     // extract and stacking near keyframes (in global coord)
     nearKeyframes->clear();
+    TFEigenManager key2map = TFEigenManager(Pose2D(keyframePosesUpdated[key].x, keyframePosesUpdated[key].y, keyframePosesUpdated[key].yaw), "map", "keyframe").inverse();
+    
     for (int i = -submap_size; i <= submap_size; ++i) {
         int keyNear = key + i;
-        if (keyNear < 0 || keyNear >= keyframeLaserClouds.size() )
+        if ( keyNear < 0 || keyNear >= keyframeLaserClouds.size() )
             continue;
-
+        
+        TFEigenManager key2near = key2map * TFEigenManager(Pose2D(keyframePosesUpdated[keyNear].x, keyframePosesUpdated[keyNear].y, keyframePosesUpdated[keyNear].yaw), "map", "nearframe");
+        // cout << key2near << endl;
         mKF.lock(); 
-        *nearKeyframes += * local2global(keyframeLaserClouds[keyNear], keyframePosesUpdated[root_idx]);
+        // *nearKeyframes += *transformPointCloud(keyframeLaserClouds[keyNear], keyframePosesUpdated[keyNear]);
+        *nearKeyframes += *transformPointCloud(keyframeLaserClouds[keyNear], key2near.toRotationMatrix());
         mKF.unlock(); 
     }
 
@@ -455,14 +486,13 @@ void loopFindNearKeyframesCloud( pcl::PointCloud<PointType>::Ptr& nearKeyframes,
 
 // 3
 
-std::optional<gtsam::Pose3> doICPVirtualRelative( int _loop_kf_idx, int _curr_kf_idx ) {
+std::optional<gtsam::Pose3> doICPVirtualRelative(int _loop_kf_idx, int _curr_kf_idx) {
     // parse pointclouds
     int historyKeyframeSearchNum = 25; // enough. ex. [-25, 25] covers submap length of 50x1 = 50m if every kf gap is 1m
     pcl::PointCloud<PointType>::Ptr cureKeyframeCloud(new pcl::PointCloud<PointType>());
     pcl::PointCloud<PointType>::Ptr targetKeyframeCloud(new pcl::PointCloud<PointType>());
     loopFindNearKeyframesCloud(cureKeyframeCloud, _curr_kf_idx, 0, _loop_kf_idx); // use same root of loop kf idx 
-    loopFindNearKeyframesCloud(targetKeyframeCloud, _loop_kf_idx, 0, _loop_kf_idx); 
-    // loopFindNearKeyframesCloud(targetKeyframeCloud, _loop_kf_idx, historyKeyframeSearchNum, _loop_kf_idx); 
+    loopFindNearKeyframesCloud(targetKeyframeCloud, _loop_kf_idx, historyKeyframeSearchNum, _loop_kf_idx); 
 
     // loop verification 
     sensor_msgs::PointCloud2 cureKeyframeCloudMsg;
@@ -489,7 +519,7 @@ std::optional<gtsam::Pose3> doICPVirtualRelative( int _loop_kf_idx, int _curr_kf
     pcl::PointCloud<PointType>::Ptr unused_result(new pcl::PointCloud<PointType>());
     icp.align(*unused_result);
  
-    float loopFitnessScoreThreshold = 0.3; // user parameter but fixed low value is safe. 
+    float loopFitnessScoreThreshold = 100.0; // user parameter but fixed low value is safe. 
     if (icp.hasConverged() == false || icp.getFitnessScore() > loopFitnessScoreThreshold) {
         std::cout << "\033[1;31m[Referee loop] ICP fitness test failed (" << icp.getFitnessScore() << " > " << loopFitnessScoreThreshold << "). Reject this Referee loop." << "\033[0m" << std::endl;
         return std::nullopt;
@@ -508,18 +538,37 @@ std::optional<gtsam::Pose3> doICPVirtualRelative( int _loop_kf_idx, int _curr_kf
     return poseFrom.between(poseTo);
 } // doICPVirtualRelative
 
-// 
+//
+void colorize(const pcl::PointCloud<PointType> &pc,
+              pcl::PointCloud<pcl::PointXYZRGB> &pc_colored,
+              const std::vector<int> &color) {
+
+    int N              = pc.points.size();
+
+    pc_colored.clear();
+    pcl::PointXYZRGB pt_tmp;
+    for (int         i = 0; i < N; ++i) {
+        const auto &pt = pc.points[i];
+        pt_tmp.x = pt.x;
+        pt_tmp.y = pt.y;
+        pt_tmp.z = pt.z;
+        pt_tmp.r = color[0];
+        pt_tmp.g = color[1];
+        pt_tmp.b = color[2];
+        pc_colored.points.emplace_back(pt_tmp);
+    }
+}
+
 /***************************************** With Initial ****************************************/
 std::optional<gtsam::Pose3> doICPVirtualRelativeWithInitial(int _loop_kf_idx, int _curr_kf_idx, float _yaw_diff)
 {
     // parse pointclouds
-    int historyKeyframeSearchNum = 25; // enough. ex. [-25, 25] covers submap length of 50x1 = 50m if every kf gap is 1m
+    int historyKeyframeSearchNum = 10; // enough. ex. [-25, 25] covers submap length of 50x1 = 50m if every kf gap is 1m
     pcl::PointCloud<PointType>::Ptr currKeyframeCloud(new pcl::PointCloud<PointType>());
     pcl::PointCloud<PointType>::Ptr targetKeyframeCloud(new pcl::PointCloud<PointType>());
     loopFindNearKeyframesCloud(currKeyframeCloud, _curr_kf_idx, 0, _loop_kf_idx); // use same root of loop kf idx 
     // loopFindNearKeyframesCloud(targetKeyframeCloud, _loop_kf_idx, historyKeyframeSearchNum, _loop_kf_idx); 
-    loopFindNearKeyframesCloud(targetKeyframeCloud, _loop_kf_idx, 0, _loop_kf_idx); 
-    viewer.showCloud(targetKeyframeCloud, "tgt_viz");
+    loopFindNearKeyframesCloud(targetKeyframeCloud, _loop_kf_idx, 0, _loop_kf_idx);
 
     // loop verification 
     sensor_msgs::PointCloud2 curKeyframeCloudMsg;
@@ -552,7 +601,7 @@ std::optional<gtsam::Pose3> doICPVirtualRelativeWithInitial(int _loop_kf_idx, in
     // icp.setRANSACOutlierRejectionThreshold(ransac_outlier_rejection_threshold_);
 
     // Rotate target point cloud for ICP
-    Eigen::Matrix4f rotation_matrix = Eigen::Matrix4f::Identity();
+    Eigen::Matrix4d rotation_matrix = Eigen::Matrix4d::Identity();
     float cos_yaw = cos(_yaw_diff);
     float sin_yaw = sin(_yaw_diff);
     rotation_matrix(0,0) = cos_yaw;
@@ -560,6 +609,7 @@ std::optional<gtsam::Pose3> doICPVirtualRelativeWithInitial(int _loop_kf_idx, in
     rotation_matrix(1,0) = sin_yaw;
     rotation_matrix(1,1) = cos_yaw;
     pcl::PointCloud<PointType>::Ptr transformed_curr = transformPointCloud(currKeyframeCloud, rotation_matrix);
+    
     // std::cout << rotation_matrix << std::endl;
     // pcl::PointCloud<PointType>::Ptr transformed_target(new pcl::PointCloud<PointType>());
     // pcl::PointCloud<PointType>::Ptr transformed_curr(new pcl::PointCloud<PointType>());
@@ -581,14 +631,24 @@ std::optional<gtsam::Pose3> doICPVirtualRelativeWithInitial(int _loop_kf_idx, in
     icp.calculateTargetCovariances();
     pcl::PointCloud<PointType>::Ptr unused_result(new pcl::PointCloud<PointType>());
     icp.align(*unused_result);
+
+    pcl::PointCloud<pcl::PointXYZRGB>::Ptr src_colored(new pcl::PointCloud<pcl::PointXYZRGB>);
+    pcl::PointCloud<pcl::PointXYZRGB>::Ptr tgt_colored(new pcl::PointCloud<pcl::PointXYZRGB>);
+    colorize(*unused_result, *src_colored, {255, 0, 0});
+    colorize(*targetKeyframeCloud, *tgt_colored, {0, 255, 0});
+    viewer.showCloud(src_colored, "src_viz");
+    viewer.showCloud(tgt_colored, "tgt_viz");
     
-    float icpScoreThreshold = 0.5; // user parameter but fixed low value is safe.
+    float icpScoreThreshold = 200.; // user parameter but fixed low value is safe.
+    icp_scores.push_back(icp.getFitnessScore());
     if (icp.hasConverged() == false || icp.getFitnessScore() > icpScoreThreshold) {
         std::cout << "\033[1;31m[Referee loop] ICP fitness test failed (" << icp.getFitnessScore() << " > " << icpScoreThreshold << "). Reject this Referee loop.\033[0m" << std::endl;
         return std::nullopt;
     } else {
         std::cout << "\033[1;32m[Referee loop] ICP fitness test passed (" << icp.getFitnessScore() << " < " << icpScoreThreshold << "). Add this Referee loop.\033[0m" << std::endl;
     }
+    
+    
 
     // Get pose transformation
     float x, y, z, roll, pitch, yaw;
@@ -791,6 +851,10 @@ void process_icp(void)
             std::optional<gtsam::Pose3> relative_pose_optional;
             if (is_withInitialICP) {
                 relative_pose_optional = doICPVirtualRelativeWithInitial(prev_node_idx, curr_node_idx, loop_idx_pair.yaw_diff);
+                // std::fstream icp_score_stream(std::string(save_directory + "icp_score.txt").c_str(), std::fstream::out);
+                // for(auto score: icp_scores) {
+                //     icp_score_stream << std::to_string(score) + "\n";
+                // }
             } else {
                 relative_pose_optional = doICPVirtualRelative(prev_node_idx, curr_node_idx);
             }
@@ -897,7 +961,7 @@ int main(int argc, char **argv)
     pgTimeSaveStream.precision(std::numeric_limits<double>::max_digits10);
 
     nh.param<double>("keyframe_meter_gap", keyframeMeterGap, 0.0); // pose assignment every k frames 
-    nh.param<bool>("is_withInitialICP", is_withInitialICP, true);
+    nh.param<bool>("is_withInitialICP", is_withInitialICP, false);
 
     ISAM2Params parameters;
     parameters.relinearizeThreshold = 0.01;

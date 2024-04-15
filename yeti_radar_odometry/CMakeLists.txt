@@ -15,13 +15,10 @@ find_package(Boost REQUIRED COMPONENTS
     filesystem
 )
 find_package(PkgConfig)
-
 find_package(PythonLibs REQUIRED)
-
 find_package(PCL REQUIRED)
-
 find_package(GTSAM REQUIRED QUIET)
-
+find_package(Threads REQUIRED)
 find_package(catkin REQUIRED COMPONENTS
   geometry_msgs
   nav_msgs
@@ -112,6 +109,9 @@ target_link_libraries(association
   Eigen3::Eigen
 )
 
+add_library(keyoperation src/key_operation.cpp)
+
+target_link_libraries(keyoperation Threads::Threads)
 
 
 add_executable(visualization src/visualization.cpp)
@@ -132,6 +132,8 @@ target_link_libraries(yetiOdom
 	${catkin_LIBRARIES}
 	${OpenCV_LIBRARIES}
 	${PCL_LIBRARIES}
+  # Threads::Threads
+  keyoperation
 )
 
 add_executable(posegraph src/posegraph.cpp)

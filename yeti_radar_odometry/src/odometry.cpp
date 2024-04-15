@@ -30,6 +30,7 @@
 #include "features.hpp"
 #include "referee.hpp"
 #include "association.hpp"
+#include "key_operation.hpp"
 
 #include <yeti/CurrReferee.h>
 
@@ -40,8 +41,7 @@ ros::Publisher pubLaserCloudLocal, pubLaserCloudGlobal, pubReferee;
 Eigen::MatrixXd currOdom;
 
 // modified for MulRan dataset batch evaluation 
-int main(int argc, char *argv[]) 
-{
+int main(int argc, char *argv[]) {
 	ros::init(argc, argv, "yetiOdom");
 	ros::NodeHandle nh;
 
@@ -126,9 +126,13 @@ int main(int argc, char *argv[])
 
     yeti::CurrReferee refereeMsg;
 
-    for (uint i = 0; i < radar_files.size() - 1; ++i) 
-    {
-        if( i % 100 == 0)
+    // for (uint i = 0; i < radar_files.size() - 1; ++i) {
+    uint i = 0;
+    bool pause = false;
+    std::thread inputThread(getch, std::ref(pause));
+    while(i < radar_files.size() - 1) {
+        if(pause) continue;
+        if(i % 100 == 0)
             std::cout << i << "/" << radar_files.size() << std::endl;
 
         if (i > 0) {
@@ -136,7 +140,6 @@ int main(int argc, char *argv[])
             kp1 = kp2; img2.copyTo(img1);
         }
         // std::cout << datadir + "/" + radar_files[i] << std::endl;
-
         load_radar(datadir + "/" + radar_files[i], times, azimuths, valid, fft_data, CIR204); // use CIR204 for MulRan dataset
 
         if (keypoint_extraction == 0)
@@ -159,39 +162,38 @@ int main(int argc, char *argv[])
 
         if (keypoint_extraction == 1)
             cen2019features(fft_data, max_points, min_range, targets); // targets: 3xN
-
-            polar = targets_to_polar_image(fft_data, targets);
         
-            // Eigen::MatrixXd intensity_polar = polar.cwiseProduct(fft_data);
+        polar = targets_to_polar_image(fft_data, targets);
+    
+        // Eigen::MatrixXd intensity_polar = polar.cwiseProduct(fft_data);
 
-            cv::Mat polar_image(polar.rows(), polar.cols(), CV_64F);
-            for (int i = 0; i < polar_image.rows; ++i) {
-                for (int j = 0; j < polar_image.cols; ++j) {
-                    polar_image.at<double>(i, j) = polar(i, j);
-                }
+        cv::Mat polar_image(polar.rows(), polar.cols(), CV_64F);
+        for (int i = 0; i < polar_image.rows; ++i) {
+            for (int j = 0; j < polar_image.cols; ++j) {
+                polar_image.at<double>(i, j) = polar(i, j);
             }
-            std::string save_path = "/home/bhbhchoi/Project/ReFeree_journal/output/";
-            std::stringstream file_name_stream;
-            file_name_stream << save_path << std::setfill('0') << std::setw(6) << i << ".png";
-            std::string file_name = file_name_stream.str();
+        }
+        std::string save_path = "/home/bhbhchoi/Project/ReFeree_journal/output/";
+        std::stringstream file_name_stream;
+        file_name_stream << save_path << std::setfill('0') << std::setw(6) << i << ".png";
+        std::string file_name = file_name_stream.str();
 
-            // Save the polar image
-            cv::imwrite(file_name, polar_image);
+        // Save the polar image
+        cv::imwrite(file_name, polar_image);
 
-            // Make Referee
-            // =========================================================================
-            // Eigen::MatrixXd intensity_key(polar.cols(), 1);
-            // Eigen::MatrixXd freespace_key(polar.cols(), 1);
-            // Eigen::MatrixXd referee = make_referee(polar, intensity_key, freespace_key);
-            
-            // curr_referee = eig2stdvec(referee);
-
-            // refereeMsg.referee = curr_referee;
-            refereeMsg.refereeR = ReFereeR(polar).desc;
-            refereeMsg.refereeA = ReFereeA(polar).desc;
-            pubReferee.publish(refereeMsg);
-            
-            // =========================================================================
+        // Make Referee
+        // =========================================================================
+        // Eigen::MatrixXd intensity_key(polar.cols(), 1);
+        // Eigen::MatrixXd freespace_key(polar.cols(), 1);
+        // Eigen::MatrixXd referee = make_referee(polar, intensity_key, freespace_key);
+        
+        // curr_referee = eig2stdvec(referee);
+        
+        // refereeMsg.referee = curr_referee;
+        refereeMsg.refereeR = ReFereeR(polar).desc;
+        refereeMsg.refereeA = ReFereeA(polar).desc;
+        pubReferee.publish(refereeMsg);
+        // =========================================================================
 
 
         if (keypoint_extraction == 0 || keypoint_extraction == 1) {
@@ -210,8 +212,10 @@ int main(int argc, char *argv[])
             getTimes(cart_targets2, azimuths, times, t2);
         }
 
-        if (i == 0)
-            continue;
+        if (i == 0) {
+            ++i; continue;
+        }
+            
         
         
         // Match keypoint descriptors
@@ -373,9 +377,11 @@ int main(int argc, char *argv[])
         // make sure under 10hz, to privde enough time for following PGO module
         std::this_thread::sleep_for(std::chrono::milliseconds(100));
         // std::this_thread::sleep_for(std::chrono::milliseconds(20));
+        
+        ++i;
     }
 
     ros::spin();
-
+    inputThread.join();
     return 0;
 }
