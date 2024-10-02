@@ -1,5 +1,5 @@
 <div align="center">
-  <h1>ReFeree-Yeti-Odometry</h1>
+  <h1>ReFeree-Radar-SLAM</h1>
   <a href=""><img src="https://img.shields.io/badge/-C++-blue?logo=cplusplus" /></a>
   <a href=""><img src="https://img.shields.io/badge/-Linux-grey?logo=linux" /></a>
   <a href=""><img src="https://badges.aleen42.com/src/docker.svg" /></a>
@@ -11,12 +11,11 @@
   <br />
   <br />
   
-**[IEEE RA-L]** This repository is the official code for Narrowing your FOV with **[SOLiD](https://github.com/sparolab/solid)**: Spatially Organized and Lightweight Global Descriptor for FOV-constrained LiDAR Place Recognition.
+**[IEEE RA-L]** This repository is the official code for **ReFeree**: Radar-Based Lightweight and Robust Localization Using Feature and Free space.
 
-  <a href="https://scholar.google.com/citations?user=t5UEbooAAAAJ&hl=ko" target="_blank">Hogyun Kim</a><sup></sup>,
-  <a href="https://scholar.google.com/citations?user=wL8VdUMAAAAJ&hl=ko" target="_blank">Jiwon Choi</a><sup></sup>,
-  <a href="https://scholar.google.com/citations?user=UPg-JuQAAAAJ&hl=ko" target="_blank">Taehu Sim</a><sup></sup>,
-  <a href="https://scholar.google.com/citations?user=9mKOLX8AAAAJ&hl=ko" target="_blank">Giseop Kim</a><sup></sup>,
+  <a href="https://scholar.google.com/citations?user=t5UEbooAAAAJ&hl=ko" target="_blank">Hogyun Kim*</a><sup></sup>,
+  <a href="https://scholar.google.com/citations?user=JCJAwgIAAAAJ&hl=ko" target="_blank">Byunghee Choi*</a><sup></sup>,
+  <a href="" target="_blank">Euncheol Choi</a><sup></sup>,
   <a href="https://scholar.google.com/citations?user=W5MOKWIAAAAJ&hl=ko" target="_blank">Younggun Cho</a><sup>†</sup>
 
 </div>
