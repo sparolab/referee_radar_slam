@@ -18,6 +18,8 @@
   <a href="" target="_blank">Euncheol Choi</a><sup></sup>,
   <a href="https://scholar.google.com/citations?user=W5MOKWIAAAAJ&hl=ko" target="_blank">Younggun Cho</a><sup>†</sup>
 
+(* represents equal contribution.)
+
 </div>
 
 ## Special Thanks
