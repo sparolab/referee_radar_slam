@@ -260,7 +260,7 @@ Eigen::MatrixXd targets_to_polar_image(cv::Mat &fft_data, Eigen::MatrixXd& targe
     polar.setZero();
     
     for (int i = 0; i < targets.cols(); ++i) {
-        polar(targets(0, i), targets(1, i)) = 255;
+        polar((int)targets(0, i), (int)targets(1, i)) = 1;
     }
 
     return polar;

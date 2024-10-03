@@ -68,7 +68,7 @@ double ReFereeR::score(ReFereeR other) {
 }
 
 int ReFereeRDB::detectLoopClosureID(ReFereeR curr_refereeR) {
-    int loop_id { -1 };
+    int loop_id = -1;
     if(curr_refereeR.empty() && db_.empty()) return -1;
 
     if(db_.size() < NUM_EXCLUDE_RECENT + 1) return -1;
@@ -143,7 +143,6 @@ float ReFereeADB::getYawDiff(ReFereeA query_desc, int loop_id) {
     int idx = query_desc.maxScoreIdx(db_[loop_id], &ids_);
     float yaw_diff = 2*M_PI/query_desc.size() * (float)idx;
     if (yaw_diff > M_PI) yaw_diff = yaw_diff - 2*M_PI;
-    cout << "yaw_diff: " << yaw_diff << endl;
     return yaw_diff;
 }
 
