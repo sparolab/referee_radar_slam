@@ -75,7 +75,7 @@ $ roslaunch yeti yeti_radar_odometry.launch
 * [Yeti-Odometry](https://github.com/keenan-burnett/yeti_radar_odometry)
 * [Nano-GICP](https://github.com/engcang/nano_gicp)
 * [Navtech-Radar-SLAM](https://github.com/gisbi-kim/navtech-radar-slam)
-* 
+  
 
 ## Citation
 
