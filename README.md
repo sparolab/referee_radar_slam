@@ -4,7 +4,7 @@
   <a href=""><img src="https://img.shields.io/badge/-Linux-grey?logo=linux" /></a>
   <a href=""><img src="https://badges.aleen42.com/src/docker.svg" /></a>
   <a href="https://sites.google.com/view/referee-radar"><img src="https://github.com/sparolab/Joint_ID/blob/main/fig/badges/badge-website.svg" alt="Project" /></a>
-  <a href=""><img src="https://img.shields.io/badge/Paper-PDF-yellow" alt="Paper" /></a>
+  <a href="https://ieeexplore.ieee.org/document/10705066"><img src="https://img.shields.io/badge/Paper-PDF-yellow" alt="Paper" /></a>
   <a href="https://arxiv.org/abs/2410.01325"><img src="https://img.shields.io/badge/arXiv-2408.07330-b31b1b.svg?style=flat-square" alt="Arxiv" /></a>
   <a href="https://www.alphaxiv.org/abs/2410.01325"><img src="https://img.shields.io/badge/alphaXiv-2408.07330-darkred" alt="alphaXiv" /></a>
   <a href="https://www.youtube.com/watch?v=aQ0OlHYJCYI"><img src="https://badges.aleen42.com/src/youtube.svg" alt="YouTube" /></a>
