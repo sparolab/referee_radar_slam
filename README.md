@@ -78,6 +78,18 @@ $ roslaunch yeti yeti_radar_odometry.launch
   
 
 ## Citation
+```
+@ARTICLE{10705066,
+  author={Kim, Hogyun and Choi, Byunghee and Choi, Euncheol and Cho, Younggun},
+  journal={IEEE Robotics and Automation Letters}, 
+  title={ReFeree: Radar-Based Lightweight and Robust Localization using Feature and Free space}, 
+  year={2024},
+  volume={},
+  number={},
+  pages={1-8},
+  keywords={Radar;Feature extraction;Radar imaging;Noise;Radar cross-sections;Meteorology;Image recognition;Spaceborne radar;Simultaneous localization and mapping;Meteorological radar;Radar;Place Recognition;Localization;SLAM;Lightweight;Onboard Computing},
+  doi={10.1109/LRA.2024.3474554}}
+```
 
 ## Contact
 * Hogyun Kim (hg.kim@inha.edu)
