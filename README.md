@@ -43,7 +43,7 @@ $ sudo apt-get install ros-noetic-gtsam
 First, clone and build the repository in your ros workspace.
 ```
 $ cd your_ros_workspace/src
-$ git clone https://github.com/sparolab/referee_radar_slam.git
+$ git clone https://github.com/sparolab/ReFeree-Radar-SLAM.git
 $ cd your_ros_workspace
 $ catkin build nano_gicp && catkin build
 ```
